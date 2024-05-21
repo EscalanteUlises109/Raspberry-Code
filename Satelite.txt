@@ -1,0 +1,157 @@
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+#include <HardwareSerial.h>
+
+// Define la talla osea size 
+#define SCREEN_WIDTH 128
+#define SCREEN_HEIGHT 64
+
+// Define I2C pins
+#define OLED_SDA 8
+#define OLED_SCL 9
+
+// Define UART pins
+#define GPS_TX 4
+#define GPS_RX 5
+
+// Crea display 
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
+
+// Create a serial object for the GPS module
+HardwareSerial GPS(1);
+
+float timezone_offset = -8.0;
+
+// Funcion para convertir las coordenadas
+String convert(float deg, float min, char dir) {
+    float value = deg + (min / 60.0);
+    if (dir == 'S' || dir == 'W') {
+        value = -value;
+    }
+    char buffer[10];
+    dtostrf(value, 6, 6, buffer);
+    return String(buffer);
+}
+
+void setup() {
+    // Initialize I2C
+    Wire.begin(OLED_SDA, OLED_SCL);
+
+    // Initialize the OLED display
+    if(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
+        Serial.println(F("SSD1306 allocation failed"));
+        for(;;);
+    }
+    display.clearDisplay();
+    display.display();
+
+    // Initialize GPS UART
+    GPS.begin(9600, SERIAL_8N1, GPS_RX, GPS_TX);
+
+    Serial.begin(115200);
+}
+
+void loop() {
+    while (GPS.available() > 0) {
+        char c = GPS.read();
+        // Pass the received data to the GPS parsing function here
+        // Assuming the existence of a function updateGPS() to handle NMEA parsing
+        updateGPS(c);
+    }
+
+    float lat_deg, lat_min, lon_deg, lon_min;
+    char lat_dir, lon_dir;
+
+    // ESTO ES ASUMIENDO QUE HAYA LONGITUDES, MINUTOS ETC 
+    lat_deg = getLatitudeDegrees();
+    lat_min = getLatitudeMinutes();
+    lat_dir = getLatitudeDirection();
+
+    lon_deg = getLongitudeDegrees();
+    lon_min = getLongitudeMinutes();
+    lon_dir = getLongitudeDirection();
+
+    String latitude = convert(lat_deg, lat_min, lat_dir);
+    String longitude = convert(lon_deg, lon_min, lon_dir);
+
+    if (latitude == "0.000000" || longitude == "0.000000") {
+        display.clearDisplay();
+        display.setCursor(35, 25);
+        display.print("Datos no");
+        display.setCursor(22, 40);
+        display.print("disponibles");
+        display.display();
+        return;
+    }
+
+    int hours, minutes, seconds;
+    // Aqui para la existencia del tiempo en el gps 
+    hours = getGPSHours();
+    minutes = getGPSMinutes();
+    seconds = getGPSSeconds();
+
+    char time_buffer[9];
+    sprintf(time_buffer, "%02d:%02d:%02d", hours, minutes, seconds);
+
+    display.clearDisplay();
+    display.setCursor(10, 0);
+    display.print("Satelites: "); // Assuming a function to get the satellite count
+    display.print(getSatellitesInUse());
+    display.setCursor(0, 18);
+    display.print("Lat: ");
+    display.print(latitude);
+    display.setCursor(0, 36);
+    display.print("Lon: ");
+    display.print(longitude);
+    display.setCursor(0, 54);
+    display.print("Horario: ");
+    display.print(time_buffer);
+    display.display();
+
+    delay(1000);  // Update the display every second
+}
+
+void updateGPS(char c) {
+    // Parse the NMEA sentence
+}
+
+float getLatitudeDegrees() {
+    // Return latitude degrees
+}
+
+float getLatitudeMinutes() {
+    // Return latitude minutes
+}
+
+char getLatitudeDirection() {
+    // Return latitude direction ('N' or 'S')
+}
+
+float getLongitudeDegrees() {
+    // Return longitude degrees
+}
+
+float getLongitudeMinutes() {
+    // Return longitude minutes
+}
+
+char getLongitudeDirection() {
+    // Return longitude direction ('E' or 'W')
+}
+
+int getGPSHours() {
+    // Return hours from GPS time
+}
+
+int getGPSMinutes() {
+    // Return minutes from GPS time
+}
+
+int getGPSSeconds() {
+    // Return seconds from GPS time
+}
+
+int getSatellitesInUse() {
+    //retorna el numero de satelites en uso 
+}
