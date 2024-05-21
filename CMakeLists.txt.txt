@@ -1,0 +1,15 @@
+cmake_minimum_required(VERSION 3.12)
+
+include(pico_sdk_import.cmake)
+
+project(oled_display)
+
+pico_sdk_init()
+
+add_executable(oled_display
+    main.cpp
+)
+
+target_link_libraries(oled_display pico_stdlib hardware_i2c)
+
+pico_add_extra_outputs(oled_display)

@@ -1,0 +1,129 @@
+#include "pico/stdlib.h"
+#include "hardware/i2c.h"
+
+// Configuración de pines y dirección I2C
+#define I2C_PORT i2c0
+#define SDA_PIN 4
+#define SCL_PIN 5
+#define I2C_ADDR 0x3C // Dirección del SSD1306
+
+// Comandos del SSD1306
+#define SSD1306_CMD_DISPLAY_OFF 0xAE
+#define SSD1306_CMD_DISPLAY_ON 0xAF
+#define SSD1306_CMD_SET_DISPLAY_CLOCK_DIV 0xD5
+#define SSD1306_CMD_SET_MULTIPLEX 0xA8
+#define SSD1306_CMD_SET_DISPLAY_OFFSET 0xD3
+#define SSD1306_CMD_SET_START_LINE 0x40
+#define SSD1306_CMD_CHARGE_PUMP 0x8D
+#define SSD1306_CMD_MEMORY_MODE 0x20
+#define SSD1306_CMD_SEG_REMAP 0xA1
+#define SSD1306_CMD_COM_SCAN_DEC 0xC8
+#define SSD1306_CMD_SET_COM_PINS 0xDA
+#define SSD1306_CMD_SET_CONTRAST 0x81
+#define SSD1306_CMD_SET_PRECHARGE 0xD9
+#define SSD1306_CMD_SET_VCOM_DETECT 0xDB
+#define SSD1306_CMD_DISPLAY_ALL_ON_RESUME 0xA4
+#define SSD1306_CMD_NORMAL_DISPLAY 0xA6
+#define SSD1306_CMD_DISPLAY_ALL_ON 0xA5
+
+void ssd1306_command(uint8_t cmd) {
+    uint8_t buf[2] = {0x00, cmd};
+    i2c_write_blocking(I2C_PORT, I2C_ADDR, buf, 2, false);
+}
+
+void ssd1306_init() {
+    ssd1306_command(SSD1306_CMD_DISPLAY_OFF);
+    ssd1306_command(SSD1306_CMD_SET_DISPLAY_CLOCK_DIV);
+    ssd1306_command(0x80);
+    ssd1306_command(SSD1306_CMD_SET_MULTIPLEX);
+    ssd1306_command(0x3F);
+    ssd1306_command(SSD1306_CMD_SET_DISPLAY_OFFSET);
+    ssd1306_command(0x00);
+    ssd1306_command(SSD1306_CMD_SET_START_LINE | 0x00);
+    ssd1306_command(SSD1306_CMD_CHARGE_PUMP);
+    ssd1306_command(0x14);
+    ssd1306_command(SSD1306_CMD_MEMORY_MODE);
+    ssd1306_command(0x00);
+    ssd1306_command(SSD1306_CMD_SEG_REMAP | 0x01);
+    ssd1306_command(SSD1306_CMD_COM_SCAN_DEC);
+    ssd1306_command(SSD1306_CMD_SET_COM_PINS);
+    ssd1306_command(0x12);
+    ssd1306_command(SSD1306_CMD_SET_CONTRAST);
+    ssd1306_command(0xCF);
+    ssd1306_command(SSD1306_CMD_SET_PRECHARGE);
+    ssd1306_command(0xF1);
+    ssd1306_command(SSD1306_CMD_SET_VCOM_DETECT);
+    ssd1306_command(0x40);
+    ssd1306_command(SSD1306_CMD_DISPLAY_ALL_ON_RESUME);
+    ssd1306_command(SSD1306_CMD_NORMAL_DISPLAY);
+    ssd1306_command(SSD1306_CMD_DISPLAY_ON);
+}
+
+void ssd1306_clear() {
+    for (uint16_t i = 0; i < 1024; i++) {
+        uint8_t buf[2] = {0x40, 0x00};
+        i2c_write_blocking(I2C_PORT, I2C_ADDR, buf, 2, false);
+    }
+}
+
+void ssd1306_set_cursor(uint8_t x, uint8_t y) {
+    ssd1306_command(0xB0 + y);
+    ssd1306_command(x & 0x0F);
+    ssd1306_command(0x10 | (x >> 4));
+}
+
+void ssd1306_draw_char(char c) {
+    for (uint8_t i = 0; i < 6; i++) {
+        uint8_t buf[2] = {0x40, (i == 5) ? 0x00 : font[c - 0x20][i]};
+        i2c_write_blocking(I2C_PORT, I2C_ADDR, buf, 2, false);
+    }
+}
+
+void ssd1306_print(const char *str) {
+    while (*str) {
+        ssd1306_draw_char(*str++);
+    }
+}
+
+// Fuente de 5x7 para imprimir texto en el display
+const uint8_t font[96][6] = {
+    {0x00, 0x00, 0x00, 0x00, 0x00, 0x00}, // ' '
+    // [Resto de caracteres de la fuente aquí]
+    {0x7C, 0x82, 0xAA, 0x82, 0x7C, 0x00}, // 'O'
+    {0xFC, 0x22, 0x22, 0x22, 0x1C, 0x00}, // 'P'
+    {0x3C, 0x42, 0x42, 0x42, 0x24, 0x00}, // 'Q'
+    {0xFC, 0x22, 0x62, 0xA2, 0x1C, 0x00}, // 'R'
+    {0x44, 0x92, 0x92, 0x92, 0x62, 0x00}, // 'S'
+    {0x80, 0x80, 0xFE, 0x80, 0x80, 0x00}, // 'T'
+    {0xFC, 0x02, 0x02, 0x02, 0xFC, 0x00}, // 'U'
+    {0xF8, 0x04, 0x02, 0x04, 0xF8, 0x00}, // 'V'
+    {0xFC, 0x02, 0x1C, 0x02, 0xFC, 0x00}, // 'W'
+    {0xC6, 0x28, 0x10, 0x28, 0xC6, 0x00}, // 'X'
+    {0xC0, 0x20, 0x1E, 0x20, 0xC0, 0x00}, // 'Y'
+    {0x86, 0x8A, 0x92, 0xA2, 0xC2, 0x00}, // 'Z'
+};
+
+int main() {
+    stdio_init_all();
+
+    // Inicializar I2C
+    i2c_init(I2C_PORT, 100 * 1000); // 100 kHz
+    gpio_set_function(SDA_PIN, GPIO_FUNC_I2C);
+    gpio_set_function(SCL_PIN, GPIO_FUNC_I2C);
+    gpio_pull_up(SDA_PIN);
+    gpio_pull_up(SCL_PIN);
+
+    // Inicializar el OLED
+    ssd1306_init();
+    ssd1306_clear();
+
+    // Mostrar texto en el OLED
+    ssd1306_set_cursor(0, 0);
+    ssd1306_print("Hello, World!");
+
+    while (true) {
+        // Bucle principal
+    }
+
+    return 0;
+}
